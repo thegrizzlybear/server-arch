@@ -115,6 +115,7 @@ void handle_client_connection(int new_fd ,char *buf)
 
 	close(new_fd);
 	printf("Closing the connection\n");
+	exit(1) ;
 }
 
 int main(int argc, char ** argv)
@@ -177,7 +178,13 @@ int main(int argc, char ** argv)
 		exit(1);
 	}
 	
-
+	sa.sa_handler = sigchld_handler; // reap all dead processes
+	sigemptyset(&sa.sa_mask);
+	sa.sa_flags = SA_RESTART;
+	if (sigaction(SIGCHLD, &sa, NULL) == -1) {
+		perror("sigaction");
+		exit(1);
+	}
 
 	while(1)
 	{
