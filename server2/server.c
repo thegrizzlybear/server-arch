@@ -38,84 +38,76 @@ void *get_in_addr(struct sockaddr *sa)
 
 void clean_message(char * msg)
 {
- 
+ 	
 	int i ;
-	for(i = 0 ; msg[i] != '\0'; i++)
+//	printf("\n%d is len of the message\n",(int)strlen(msg)) ;
+	for(i = 0 ; i < strlen(msg); i++)
 	{
 		if (msg[i] == '\n')
 			msg[i] = '\0' ;
 	}
 	
-	
 }
 
 
-void handle_client_connection(int new_fd ,char *buf)
+
+void handle_client_connection(int new_fd)
 {	
 	int bytes_rcv, bytes_snd; 
 	int wait_for_message = 1;
-
-	puts("a");
+	char buf[MAXDATASIZE] ;
 	
 	while(wait_for_message)
 	{
+			memset(buf, '\0',sizeof buf) ;
 		        bytes_rcv = recv(new_fd,buf,100,0);
-                        puts("b");
                         if (bytes_rcv == -1)
                         {
                                 printf("No bytes received\n");
-				puts("c");
                                 continue ;
                         }
+			
+			printf("Client socket %d sent message %s",new_fd, buf) ;
 
                         clean_message(buf) ;
-			puts("d");
-			printf("%s\n", buf);
+			
 
                         if ( (strcmp(buf,"Hello") == 0)  || (strcmp(buf,"Hi") == 0 ))
                         {
-                                bytes_snd = send(new_fd,"OK ABC",100,0);
-				puts("e");
+                                bytes_snd = send(new_fd,"OK Uddhav",100,0);
+				printf("Replied to client\n");
                                 if (bytes_snd == -1)
                                 {
                                         printf("No bytes send\n");
-					puts("f");
-                                        //continue;
                                 }
                         }
 
                         else if ( strcmp(buf,"Bye") == 0)
                         {
-                                 bytes_snd = send(new_fd,"Goodbye ABC",100,0);
-				 puts("g");
+                                bytes_snd = send(new_fd,"Goodbye Uddhav",100,0);
+				printf("Replied to client\n");
 
                                 if (bytes_snd == -1)
                                 {
                                         printf("No bytes send\n");
-					puts("h");
-                                        //continue;
                                 }
                                 wait_for_message = 0 ;
-        //                        close(new_fd) ;
                         }
                         else
                         {
-                                bytes_snd = send(new_fd,"Goodbye ABC\n",100,0);
-				puts("i");
+                                bytes_snd = send(new_fd,"OK Uddhav",100,0);
+				printf("Replied to client\n");
                                 if (bytes_snd == -1)
                                 {
                                         printf("No bytes send\n");
-					puts("j");
-                                        //continue;
                                 }
-                                wait_for_message = 0 ;
-      //                          close(new_fd) ;
 			}
+			
 	}
 
 	close(new_fd);
-	printf("Closing the connection\n");
-	exit(1) ;
+	printf("Client said Bye; finishing\n");
+	exit(0) ;
 }
 
 int main(int argc, char ** argv)
@@ -127,7 +119,7 @@ int main(int argc, char ** argv)
 	struct sigaction sa;
 	int yes =1;
 	
-	char buf[MAXDATASIZE] ;
+	//char buf[MAXDATASIZE] ;
 	int bytes_rcv = 0 ;
 	int bytes_snd = 0 ;
 
@@ -137,6 +129,12 @@ int main(int argc, char ** argv)
 	int wait_for_message = -1 ;
 
 
+	if(argc != 2)
+	{
+		printf("<usage>: ./server 5000\n");
+		exit(0 );
+	}
+
 	memset(&hints,0 ,sizeof hints);
 	//setting up the information about the type of the address to query
 	hints.ai_family = AF_INET;
@@ -144,7 +142,7 @@ int main(int argc, char ** argv)
 	hints.ai_flags = AI_PASSIVE;
 
 
-	if((rv = getaddrinfo(NULL,PORT,&hints,&servinfo)) != 0)
+	if((rv = getaddrinfo(NULL,argv[1],&hints,&servinfo)) != 0)
 	{
 		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
 		return 1;
@@ -178,7 +176,10 @@ int main(int argc, char ** argv)
 		exit(1);
 	}
 	
-	sa.sa_handler = sigchld_handler; // reap all dead processes
+
+		
+	/* Handles child process which has turned into zombie process*/
+	sa.sa_handler = sigchld_handler;
 	sigemptyset(&sa.sa_mask);
 	sa.sa_flags = SA_RESTART;
 	if (sigaction(SIGCHLD, &sa, NULL) == -1) {
@@ -186,9 +187,11 @@ int main(int argc, char ** argv)
 		exit(1);
 	}
 
+	/**/
+
 	while(1)
 	{
-		printf("Waiting for the connection:\n");
+	//	printf("Waiting for the connection:\n");
 		sin_size = sizeof their_addr ;
 		new_fd = accept(sockfd, (struct sockaddr *)&their_addr, &sin_size);
 		if (new_fd == -1)
@@ -200,14 +203,13 @@ int main(int argc, char ** argv)
 		inet_ntop(their_addr.ss_family,
 			get_in_addr((struct sockaddr *)&their_addr),
 			s, sizeof s);
-		printf("server: got connection from %s\n", s);
+		printf("server: got connection from %s and socket %d\n", s,new_fd);
 		
 		pid_t pID = fork();
 
 		if (pID == 0)
 		{
-			printf("I am handling %s connection\n",s) ;
-			handle_client_connection(new_fd,buf);
+			handle_client_connection(new_fd);
 		}
 	}
 		

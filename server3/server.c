@@ -1,5 +1,5 @@
 /*
-*server.c - multiprocess server which can handle multiple requests
+*server.c - multithreaded server which can handle multiple requests
 */
 
 #include <stdio.h>
@@ -7,6 +7,7 @@
 #include <errno.h>
 #include <sys/types.h>
 #include <string.h>
+#include <malloc.h>
 #include <unistd.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
@@ -20,13 +21,13 @@
 #define BACKLOG 10
 
 #define MAXDATASIZE 100
-#define MAXTHREADS 2000
+#define MAXTHREADS 20000
 
 
-void sigchld_handler(int s)
+/*void sigchld_handler(int s)
 {
 	while(waitpid(-1,NULL,WNOHANG) > 0) ;
-}
+}*/
 
 void *get_in_addr(struct sockaddr *sa)
 {
@@ -44,6 +45,7 @@ void clean_message(char * msg)
 	// need to add more to the list of \n
  
 	int i ;
+//	printf("\n%d is len of msg\n",(int) strlen(msg));
 	for(i = 0 ; msg[i] != '\0'; i++)
 	{
 		if (msg[i] == '\n')
@@ -62,62 +64,55 @@ void *  handle_client_connection(void * fd)
 		
 	char buf[MAXDATASIZE] ;
 
-	puts("a");
 	
 	while(wait_for_message)
 	{
+			//char *buf = (char *) malloc(30) ;
+			memset(buf,'\0',sizeof buf);
 		        bytes_rcv = recv(new_fd,buf,100,0);
-                        puts("b");
+			//buf[strlen(buf) - 1] = '\0' ;
+			//buf[]
+			printf("Client %d has sent message:%s",new_fd,buf) ;
                         if (bytes_rcv == -1)
                         {
                                 printf("No bytes received\n");
-				puts("c");
                                 continue ;
-				//break ;
                         }
 
                         clean_message(buf) ;
-			puts("d");
-			printf("%s\n", buf);
+			//printf("%s\n", buf);
 
                         if ( (strcmp(buf,"Hello") == 0)  || (strcmp(buf,"Hi") == 0 ))
                         {
-                                bytes_snd = send(new_fd,"OK ABC",100,0);
-				puts("e");
+                                bytes_snd = send(new_fd,"OK Uddhav",100,0);
+				printf("Replied to the client\n");
                                 if (bytes_snd == -1)
                                 {
                                         printf("No bytes send\n");
-					puts("f");
                                         //continue;
                                 }
                         }
 
                         else if ( strcmp(buf,"Bye") == 0)
                         {
-                                 bytes_snd = send(new_fd,"Goodbye ABC",100,0);
-				 puts("g");
+                                bytes_snd = send(new_fd,"Goodbye Uddhav",100,0);
+				printf("Replied to the client\n");
 
                                 if (bytes_snd == -1)
                                 {
                                         printf("No bytes send\n");
-					puts("h");
                                         //continue;
                                 }
                                 wait_for_message = 0 ;
-        //                        close(new_fd) ;
                         }
                         else
                         {
-                                bytes_snd = send(new_fd,"Goodbye ABC\n",100,0);
-				puts("i");
+                                bytes_snd = send(new_fd,"OK Uddhav",100,0);
+				printf("Replied to the client\n");
                                 if (bytes_snd == -1)
                                 {
                                         printf("No bytes send\n");
-					puts("j");
-                                        //continue;
                                 }
-                                wait_for_message = 0 ;
-      //                          close(new_fd) ;
 			}
 	}
 
@@ -135,6 +130,13 @@ int main(int argc, char ** argv)
 	struct sigaction sa;
 	int yes =1;
 	
+
+
+	if(argc != 2)
+	{
+		printf("<usage>: ./server 5000\n");
+		exit(0) ;
+	}
 	//char buf[MAXDATASIZE] ;
 	//int bytes_rcv = 0 ;
 	//int bytes_snd = 0 ;
@@ -155,7 +157,7 @@ int main(int argc, char ** argv)
 	hints.ai_flags = AI_PASSIVE;
 
 
-	if((rv = getaddrinfo(NULL,PORT,&hints,&servinfo)) != 0)
+	if((rv = getaddrinfo(NULL,argv[1],&hints,&servinfo)) != 0)
 	{
 		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
 		return 1;
@@ -213,7 +215,7 @@ int main(int argc, char ** argv)
 		inet_ntop(their_addr.ss_family,
 			get_in_addr((struct sockaddr *)&their_addr),
 			s, sizeof s);
-		printf("server: got connection from %s\n", s);
+		printf("server: got connection from %s and socket %d\n", s,new_fd);
 		
 
 		iret[i] = pthread_create(&serverThreads[i],NULL,handle_client_connection,(void *) &new_fd);
@@ -224,8 +226,8 @@ int main(int argc, char ** argv)
 		}
 		else
 		{
-			printf("%d is the return value\n",iret[i]);
-			if (i == 1999)
+			//printf("%d is the return value\n",iret[i]);
+			if (i == 19999)
 			{	
 				printf("Thread limit over\n");
 			 	break ;
