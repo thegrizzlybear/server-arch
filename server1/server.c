@@ -16,7 +16,7 @@
 #include <signal.h>
 
 #define PORT "5000"
-#define BACKLOG 10
+#define BACKLOG -1 // did not make any difference for the scenario I was looking for
 
 #define MAXDATASIZE 100
 
@@ -68,6 +68,14 @@ int main(int argc, char ** argv)
 
 	int wait_for_message = -1 ;
 
+	int count_client_connections = 0; 
+
+	// requirement is to take server port from commandline
+	if (argc != 2 )
+	{
+		printf("<usage>: ./server 5000\n") ;
+		exit(0 );
+	}
 
 	memset(&hints,0 ,sizeof hints);
 	//setting up the information about the type of the address to query
@@ -76,7 +84,7 @@ int main(int argc, char ** argv)
 	hints.ai_flags = AI_PASSIVE;
 
 
-	if((rv = getaddrinfo(NULL,PORT,&hints,&servinfo)) != 0)
+	if((rv = getaddrinfo(NULL,argv[1],&hints,&servinfo)) != 0)
 	{
 		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
 		return 1;
@@ -90,11 +98,11 @@ int main(int argc, char ** argv)
 		return 1;
 	}
 	
-	if (setsockopt(sockfd,SOL_SOCKET,SO_REUSEADDR, &yes,sizeof (int)) == -1)
+	/*if (setsockopt(sockfd,SOL_SOCKET,SO_REUSEADDR, &yes,sizeof (int)) == -1)
 	{
 		printf("setsockopt\n");
 		exit(1);
-	}
+	}*/
 	if (bind(sockfd,servinfo->ai_addr, servinfo->ai_addrlen) == -1)
 	{
 		close(sockfd);
@@ -112,27 +120,28 @@ int main(int argc, char ** argv)
 	
 
 
-	while(1)
-	{
+	
 		printf("Waiting for the connection:\n");
 		sin_size = sizeof their_addr ;
+	
 		new_fd = accept(sockfd, (struct sockaddr *)&their_addr, &sin_size);
+		errno = 48 ; // did not work either to throw Address Already in Use exception
 		if (new_fd == -1)
 		{
-			printf("accept error\n");
-			continue ;
+			printf("accept error:%d\n",errno);
+			close(sockfd);
+			exit(0);
 		}
 
 		inet_ntop(their_addr.ss_family,
 			get_in_addr((struct sockaddr *)&their_addr),
 			s, sizeof s);
-		printf("server: got connection from %s\n", s);
+		printf("server: got connection from %s and socket number %d\n", s,new_fd);
 
 		wait_for_message = 1 ;
 		while(wait_for_message)
 		{
 			bytes_rcv = recv(new_fd,buf,100,0);
-			buf[strlen(buf) - 1] = '\0';
 			if (bytes_rcv == -1)
 			{
 				printf("No bytes received\n");
@@ -141,47 +150,48 @@ int main(int argc, char ** argv)
 			
 			clean_message(buf) ;
 			
+			printf("Client socket %d sent %s message\n",new_fd,buf);
 
 			if ( (strcmp(buf,"Hello") == 0)  || (strcmp(buf,"Hi") == 0 ))
 			{
-				bytes_snd = send(new_fd,"OK ABC",100,0);
-			
+				bytes_snd = send(new_fd,"OK Uddhav",100,0);
+				printf("Replied to client %d\n",new_fd) ;
 				if (bytes_snd == -1)
 				{
 					printf("No bytes send\n");
-					//continue;
 				}
 			}
 
 			else if ( strcmp(buf,"Bye") == 0)
                		{
-               	        	 bytes_snd = send(new_fd,"Goodbye ABC",100,0);
+               	        	bytes_snd = send(new_fd,"Goodbye Uddhav",100,0);
+				printf("Replied to client %d\n",new_fd) ;
+				printf("Client said Bye; finishing \n") ;
+
 
 	                        if (bytes_snd == -1)
         	                {
                 	                printf("No bytes send\n");
-                        	        //continue;
                         	}
 				wait_for_message = 0 ;
 				close(new_fd) ;
         	        }
 			else
 			{
-				bytes_snd = send(new_fd,"Goodbye ABC\n",100,0);
+				bytes_snd = send(new_fd,"OK Uddhav",100,0);
+				printf("Replied to client %d\n",new_fd) ;
 				if (bytes_snd == -1)
                                 {
                                         printf("No bytes send\n");
-                                        //continue;
                                 }
-                                wait_for_message = 0 ;
-                                close(new_fd) ;
 
 			}
 
 		}
 
 		
-	}
+	
+	close(sockfd) ;
 		
 	return 0 ;
 }
